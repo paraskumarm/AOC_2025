@@ -69,31 +69,51 @@ long long solve(vector<pair<int, int>> &points)
     
     cout << "looping1......" << endl;
     
-    // Flood fill from outside to mark exterior cells as 'X'
-    // Everything not marked 'X' and not already '#' or 'O' will be interior
+    // Flood fill from outside to mark exterior cells as 'X' (iterative to avoid stack overflow)
     vector<vector<bool>> visited(board.size(), vector<bool>(board[0].size(), false));
+    queue<pair<int,int>> q;
     
-    function<void(int,int)> floodFill = [&](int y, int x) {
-        if (y < 0 || y >= board.size() || x < 0 || x >= board[0].size()) return;
-        if (visited[y][x] || board[y][x] == '#' || board[y][x] == 'O') return;
-        
-        visited[y][x] = true;
-        board[y][x] = 'X';  // Mark as exterior
-        
-        floodFill(y+1, x);
-        floodFill(y-1, x);
-        floodFill(y, x+1);
-        floodFill(y, x-1);
-    };
-    
-    // Start flood fill from all edges
+    // Start from all edges
     for (int i = 0; i < board.size(); i++) {
-        floodFill(i, 0);
-        floodFill(i, board[0].size()-1);
+        if (board[i][0] != '#' && board[i][0] != 'O') {
+            q.push({i, 0});
+            visited[i][0] = true;
+        }
+        if (board[i][board[0].size()-1] != '#' && board[i][board[0].size()-1] != 'O') {
+            q.push({i, board[0].size()-1});
+            visited[i][board[0].size()-1] = true;
+        }
     }
     for (int j = 0; j < board[0].size(); j++) {
-        floodFill(0, j);
-        floodFill(board.size()-1, j);
+        if (board[0][j] != '#' && board[0][j] != 'O') {
+            q.push({0, j});
+            visited[0][j] = true;
+        }
+        if (board[board.size()-1][j] != '#' && board[board.size()-1][j] != 'O') {
+            q.push({board.size()-1, j});
+            visited[board.size()-1][j] = true;
+        }
+    }
+    
+    // BFS to mark all exterior cells
+    int dy[] = {-1, 1, 0, 0};
+    int dx[] = {0, 0, -1, 1};
+    
+    while (!q.empty()) {
+        auto [y, x] = q.front();
+        q.pop();
+        board[y][x] = 'X';
+        
+        for (int i = 0; i < 4; i++) {
+            int ny = y + dy[i];
+            int nx = x + dx[i];
+            
+            if (ny >= 0 && ny < board.size() && nx >= 0 && nx < board[0].size() &&
+                !visited[ny][nx] && board[ny][nx] != '#' && board[ny][nx] != 'O') {
+                visited[ny][nx] = true;
+                q.push({ny, nx});
+            }
+        }
     }
     
     // Mark all non-exterior, non-green, non-red cells as interior (green)
