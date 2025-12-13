@@ -4,6 +4,7 @@
 #include <vector>
 #include <utility>
 #include <climits>
+#include <queue>
 using namespace std;
 /**
  *
@@ -21,59 +22,142 @@ using namespace std;
  */
 long long solve(vector<pair<int, int>> &points)
 {
-    long long res = 0;
+
+    //------START-------
+    long long res=0;
+    int numrows=0;
+    int numcols=0;
+    for(int i=0;i<points.size();i++){
+        // cout << points[i].second<<" ";
+        // cout << points[i].first << " ";
+        // cout<<endl;
+        numrows = max(numrows, points[i].second);
+        numcols = max(numcols, points[i].first);
+    }
+
+    vector<string> board(numrows + 2, string(numcols + 2, '.'));
+
+    for (int i = 0; i < points.size(); i++)
+    {
+        int colNum=points[i].first;
+        int rowNum= points[i].second;
+        board[rowNum][colNum] = '#';
+    }
+    // Connect consecutive points with green tiles (following input order)
+    for (int i = 0; i < points.size(); i++) {
+        int nextIdx = (i + 1) % points.size();  // Wrap around to first
+        int x1 = points[i].first, y1 = points[i].second;
+        int x2 = points[nextIdx].first, y2 = points[nextIdx].second;
+        
+        // Fill line between consecutive points
+        if (x1 == x2) {  // Same column - vertical line
+            int minY = min(y1, y2);
+            int maxY = max(y1, y2);
+            for (int y = minY; y <= maxY; y++) {
+                if (board[y][x1] != '#')
+                    board[y][x1] = 'O';
+            }
+        } else if (y1 == y2) {  // Same row - horizontal line
+            int minX = min(x1, x2);
+            int maxX = max(x1, x2);
+            for (int x = minX; x <= maxX; x++) {
+                if (board[y1][x] != '#')
+                    board[y1][x] = 'O';
+            }
+        }
+    }
+    
+    cout << "looping1......" << endl;
+    
+    // Flood fill from outside to mark exterior cells as 'X'
+    // Everything not marked 'X' and not already '#' or 'O' will be interior
+    vector<vector<bool>> visited(board.size(), vector<bool>(board[0].size(), false));
+    
+    function<void(int,int)> floodFill = [&](int y, int x) {
+        if (y < 0 || y >= board.size() || x < 0 || x >= board[0].size()) return;
+        if (visited[y][x] || board[y][x] == '#' || board[y][x] == 'O') return;
+        
+        visited[y][x] = true;
+        board[y][x] = 'X';  // Mark as exterior
+        
+        floodFill(y+1, x);
+        floodFill(y-1, x);
+        floodFill(y, x+1);
+        floodFill(y, x-1);
+    };
+    
+    // Start flood fill from all edges
+    for (int i = 0; i < board.size(); i++) {
+        floodFill(i, 0);
+        floodFill(i, board[0].size()-1);
+    }
+    for (int j = 0; j < board[0].size(); j++) {
+        floodFill(0, j);
+        floodFill(board.size()-1, j);
+    }
+    
+    // Mark all non-exterior, non-green, non-red cells as interior (green)
+    for (int i = 0; i < board.size(); i++) {
+        for (int j = 0; j < board[i].size(); j++) {
+            if (board[i][j] == '.') {
+                board[i][j] = 'O';  // Interior cell
+            } else if (board[i][j] == 'X') {
+                board[i][j] = '.';  // Restore exterior to '.'
+            }
+        }
+    }
+    
+    cout << "looping2......" << endl;
+    
+    // Build 2D prefix sum for O(1) rectangle checking
+    int boardRows = board.size();
+    int boardCols = board[0].size();
+    vector<vector<int>> prefix(boardRows, vector<int>(boardCols, 0));
+    
+    for (int i = 0; i < boardRows; i++) {
+        for (int j = 0; j < boardCols; j++) {
+            prefix[i][j] = (board[i][j] != '.' ? 1 : 0);
+            if (i > 0) prefix[i][j] += prefix[i-1][j];
+            if (j > 0) prefix[i][j] += prefix[i][j-1];
+            if (i > 0 && j > 0) prefix[i][j] -= prefix[i-1][j-1];
+        }
+    }
+
+    cout << "looping5......" << endl;
     pair<long long,long long> bestP1 = {-1,-1}, bestP2 = {-1,-1};
     int n = points.size();
-    // Initialize min/max trackers for each row (y) and column (x)
-    vector<vector<int>> rows(10000, {INT_MAX, INT_MIN});
-    vector<vector<int>> cols(10000, {INT_MAX, INT_MIN});
-    //rows={{},{}}
-    for (int i = 0; i < points.size(); i++) {
-        int x = points[i].first;
-        int y = points[i].second;
-        rows[y][0] = min(rows[y][0], x);
-        rows[y][1] = max(rows[y][1], x);
-
-        cols[x][0] = min(cols[x][0], y);
-        cols[x][1] = max(cols[x][1], y);
-    }
-    // for(int i=0;i<14;i++){
-    //     cout<<"i-->"<<i<<" val-->"<<cols[i][0]<<"->"<<cols[i][1]<<endl;
-    // }
+    
     for (int i = 0; i < n; i++)
     {
-        for (int j = 0; j < n; j++)
+        for (int j = i+1; j < n; j++)
         {
-            pair<long long, long long> p1 = points[i];
-            pair<long long, long long> p2 = points[j];
-            //wrt p1
-                    if ((p2.first >= rows[p1.second][0] && p2.first <= rows[p1.second][1]) && (p2.second >= cols[p1.first][0] && p2.second <= cols[p1.first][1]))
-            {
-                
-                // Rectangle extent is defined by extremes on p1's row and column
-                        long long dx = p1.first - p2.first + 1;
-                        long long dy = p1.second - p2.second + 1;
-                        long long local_ans = abs(dx * dy);
-
-                        // Debug log: variables contributing to decision
-                        cout << "IF match: p1=(" << p1.first << "," << p1.second << ") p2=(" 
-                             << p2.first << "," << p2.second << ") | rows[y]=[" 
-                             << rows[p1.second][0] << "," << rows[p1.second][1] << "] cols[x]=[" 
-                             << cols[p1.first][0] << "," << cols[p1.first][1] << "] dx=" << dx 
-                             << " dy=" << dy << " area=" << local_ans << "\n";
-
-                        if (local_ans > res) {
-                            res = local_ans;
-                            bestP1 = p1;
-                            bestP2 = p2;
+            int minX = min(points[i].first, points[j].first);
+            int maxX = max(points[i].first, points[j].first);
+            int minY = min(points[i].second, points[j].second);
+            int maxY = max(points[i].second, points[j].second);
+            
+            // Use prefix sum to check if rectangle is filled in O(1)
+            int sum = prefix[maxY][maxX];
+            if (minY > 0) sum -= prefix[minY-1][maxX];
+            if (minX > 0) sum -= prefix[maxY][minX-1];
+            if (minY > 0 && minX > 0) sum += prefix[minY-1][minX-1];
+            
+            int expectedArea = (maxY - minY + 1) * (maxX - minX + 1);
+            
+            if (sum == expectedArea) {
+                long long area = (long long)expectedArea;
+                if (area > res) {
+                    res = area;
+                    bestP1 = points[i];
+                    bestP2 = points[j];
                 }
             }
         }
     }
-    if (bestP1.first != -1) {
-        cout << "Best corners: (" << bestP1.first << "," << bestP1.second << ") and (" 
-             << bestP2.first << "," << bestP2.second << ")\n";
-    }
+    // if (bestP1.first != -1) {
+    //     cout << "Best corners: (" << bestP1.first << "," << bestP1.second << ") and (" 
+    //          << bestP2.first << "," << bestP2.second << ")\n";
+    // }
     return res;
 }
 int main()
